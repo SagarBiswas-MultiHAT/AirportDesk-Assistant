@@ -2,7 +2,7 @@
 
 This little console app helps you check airport desk lines (time, flight, and computer ID) so they look neat and correct.
 
-![](https://imgur.com/oPPoqgN.png)
+![](https://imgur.com/VhpWGTQ.png)
 
 ## What is inside
 - `Airport-v1.cpp` – the program code.
