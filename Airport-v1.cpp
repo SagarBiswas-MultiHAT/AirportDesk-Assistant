@@ -20,16 +20,18 @@ namespace fs = std::filesystem;
 // Store recent valid entries so kids can see their work again
 const fs::path kLatestFile = "latestValues.txt";
 
-/*
-const fs::path kLatestFile = "PRO/latestValues.txt";
-// Ensure the directory exists
+// Ensure the directory for `kLatestFile` exists (no-op if file is in cwd)
 void ensureDirectoryExists() {
-    fs::path dir = kLatestFile.parent_path();
-    if (!dir.empty() && !fs::exists(dir)) {
-        fs::create_directories(dir);
+    try {
+        fs::path dir = kLatestFile.parent_path();
+        if (!dir.empty() && !fs::exists(dir)) {
+            fs::create_directories(dir);
+        }
+    }
+    catch (const std::exception& e) {
+        // If we cannot create the directory, continue without crashing.
     }
 }
-*/
 
 // -------------------- Terminal helpers (cross-platform) --------------------
 static bool supports_colors = true;
@@ -44,15 +46,15 @@ void enableVirtualTerminalOnWindows() {
     if (!SetConsoleMode(hOut, dwMode)) { supports_colors = false; return; }
 #endif
 }
-void color(const string &code) {
+void color(const string& code) {
     if (!supports_colors) return;
     cout << code;
 }
-void red()   { color("\033[1;31m"); }
+void red() { color("\033[1;31m"); }
 void green() { color("\033[1;32m"); }
-void cyan()  { color("\033[1;36m"); }
-void yellow(){ color("\033[1;33m"); }
-void resetc(){ color("\033[0m"); }
+void cyan() { color("\033[1;36m"); }
+void yellow() { color("\033[1;33m"); }
+void resetc() { color("\033[0m"); }
 
 void clearScreen() {
 #ifdef _WIN32
@@ -66,7 +68,7 @@ void clearScreen() {
     GetConsoleScreenBufferInfo(hStd, &csbi);
     DWORD cellCount = csbi.dwSize.X * csbi.dwSize.Y;
     DWORD count;
-    COORD home = {0, 0};
+    COORD home = { 0, 0 };
     FillConsoleOutputCharacter(hStd, ' ', cellCount, home, &count);
     FillConsoleOutputAttribute(hStd, csbi.wAttributes, cellCount, home, &count);
     SetConsoleCursorPosition(hStd, home);
@@ -88,42 +90,42 @@ struct ValidationResult {
     string message;
 };
 
-bool validateFlightId(const string &flt, string &msg) {
+bool validateFlightId(const string& flt, string& msg) {
     if (flt.empty()) { msg = "flight id missing"; return false; }
     if (!isalpha(static_cast<unsigned char>(flt[0]))) { msg = "flight id must start with a letter"; return false; }
     if (flt.size() > 10) { msg = "flight id too long (max 10)"; return false; }
     return true;
 }
 
-bool validateComputerId(const string &comp, string &msg) {
+bool validateComputerId(const string& comp, string& msg) {
     if (comp.size() != 3) { msg = "computer id must be exactly 3 characters"; return false; }
-    for (char ch: comp) if (!isalnum(static_cast<unsigned char>(ch))) { msg = "computer id must be letters/numbers"; return false; }
+    for (char ch : comp) if (!isalnum(static_cast<unsigned char>(ch))) { msg = "computer id must be letters/numbers"; return false; }
     char b = toupper(static_cast<unsigned char>(comp[1])), c = toupper(static_cast<unsigned char>(comp[2]));
-    if (b=='I' || b=='O' || c=='I' || c=='O') { msg = "avoid letter I or O in last two spots"; return false; }
+    if (b == 'I' || b == 'O' || c == 'I' || c == 'O') { msg = "avoid letter I or O in last two spots"; return false; }
     return true;
 }
 
 // Parse and validate HHMMSS-like numeric input or HH:MM:SS
-optional<Record> parseRecordFromLine(const string &line, ValidationResult &vr) {
+optional<Record> parseRecordFromLine(const string& line, ValidationResult& vr) {
     // Accept formats:
     //  1) HHMMSS FLTID COMP
     //  2) HH:MM:SS,FLTID,COMP
     //  3) whitespace separated
     string s = line;
     // Trim front/back
-    auto ltrim = [](string &str){ str.erase(str.begin(), find_if(str.begin(), str.end(), [](int ch){ return !isspace(ch); })); };
-    auto rtrim = [](string &str){ str.erase(find_if(str.rbegin(), str.rend(), [](int ch){ return !isspace(ch); }).base(), str.end()); };
+    auto ltrim = [](string& str) { str.erase(str.begin(), find_if(str.begin(), str.end(), [](int ch) { return !isspace(ch); })); };
+    auto rtrim = [](string& str) { str.erase(find_if(str.rbegin(), str.rend(), [](int ch) { return !isspace(ch); }).base(), str.end()); };
     ltrim(s); rtrim(s);
-    if (s.empty()) { vr = {false, "empty line"}; return {}; }
+    if (s.empty()) { vr = { false, "empty line" }; return {}; }
 
     // Replace comma with space for simple tokenization
     string mod;
-    for (char c: s) mod += (c == ',' ? ' ' : c);
+    for (char c : s) mod += (c == ',' ? ' ' : c);
 
     istringstream iss(mod);
     string timeToken, flt, comp;
     if (!(iss >> timeToken >> flt >> comp)) {
-        vr = {false, "expected 3 pieces: time flight computer"};
+        vr = { false, "expected 3 pieces: time flight computer" };
         return {};
     }
 
@@ -135,40 +137,42 @@ optional<Record> parseRecordFromLine(const string &line, ValidationResult &vr) {
     Record rec;
     if (regex_match(timeToken, m, r1)) {
         rec.time_h = stoi(m[1].str()); rec.time_m = stoi(m[2].str()); rec.time_s = stoi(m[3].str());
-    } else if (regex_match(timeToken, m, r2)) {
+    }
+    else if (regex_match(timeToken, m, r2)) {
         string t = m[1].str();
-        rec.time_h = stoi(t.substr(0,2)); rec.time_m = stoi(t.substr(2,2)); rec.time_s = stoi(t.substr(4,2));
-    } else {
-        vr = {false, "time should look like 09:25:30 or 092530"};
+        rec.time_h = stoi(t.substr(0, 2)); rec.time_m = stoi(t.substr(2, 2)); rec.time_s = stoi(t.substr(4, 2));
+    }
+    else {
+        vr = { false, "time should look like 09:25:30 or 092530" };
         return {};
     }
-    auto valid_time = [](int hh,int mm,int ss){
-        return hh>=0 && hh<=23 && mm>=0 && mm<=59 && ss>=0 && ss<=59;
-    };
+    auto valid_time = [](int hh, int mm, int ss) {
+        return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59 && ss >= 0 && ss <= 59;
+        };
     if (!valid_time(rec.time_h, rec.time_m, rec.time_s)) {
-        vr = {false, "time out of range"};
+        vr = { false, "time out of range" };
         return {};
     }
 
     string msg;
-    if (!validateFlightId(flt, msg)) { vr = {false, msg}; return {}; }
-    if (!validateComputerId(comp, msg)) { vr = {false, msg}; return {}; }
+    if (!validateFlightId(flt, msg)) { vr = { false, msg }; return {}; }
+    if (!validateComputerId(comp, msg)) { vr = { false, msg }; return {}; }
 
     // assign validated fields
     rec.flight = flt;
     rec.computer = comp;
-    vr = {true, "OK"};
+    vr = { true, "OK" };
     return rec;
 }
 
-string formatTime(const Record &r) {
+string formatTime(const Record& r) {
     ostringstream out;
     out << setfill('0') << setw(2) << r.time_h << ":" << setw(2) << r.time_m << ":" << setw(2) << r.time_s;
     return out.str();
 }
 
 // -------------------- Utilities --------------------
-string promptLine(const string &prompt) {
+string promptLine(const string& prompt) {
     cout << prompt;
     string res;
     getline(cin, res);
@@ -199,7 +203,7 @@ void showQuickRules() {
     cout << "Saved good answers go to latestValues.txt so you can see them later.\n";
 }
 
-optional<int> askNumber(const string &label, int lo, int hi) {
+optional<int> askNumber(const string& label, int lo, int hi) {
     while (true) {
         cout << label << " (" << lo << "-" << hi << ", or 'q' to cancel): ";
         string text; getline(cin, text);
@@ -209,7 +213,8 @@ optional<int> askNumber(const string &label, int lo, int hi) {
             int v = stoi(text);
             if (v < lo || v > hi) { red(); cout << "Please stay between " << lo << " and " << hi << ".\n"; resetc(); continue; }
             return v;
-        } catch (...) {
+        }
+        catch (...) {
             red(); cout << "Type numbers only.\n"; resetc();
         }
     }
@@ -249,7 +254,7 @@ optional<Record> kidFriendlyWizard() {
     return r;
 }
 
-void appendRecordToLatest(const Record &r) {
+void appendRecordToLatest(const Record& r) {
     ofstream out(kLatestFile, ios::app);
     if (!out) {
         red(); cout << "Could not open " << kLatestFile << " to save the entry.\n"; resetc();
@@ -296,7 +301,7 @@ void interactiveSingleEntry() {
     cout << "  Computer: " << rec->computer << "\n";
 }
 
-void analyzeFile(const fs::path &filepath) {
+void analyzeFile(const fs::path& filepath) {
     if (!fs::exists(filepath)) {
         red(); cout << "File not found: " << filepath << "\n"; resetc();
         return;
@@ -310,7 +315,7 @@ void analyzeFile(const fs::path &filepath) {
     string line;
     size_t lineNo = 0;
     size_t okCount = 0, badCount = 0;
-    vector<pair<size_t,string>> errors;
+    vector<pair<size_t, string>> errors;
     vector<Record> goodRecords;
 
     while (getline(fin, line)) {
@@ -320,7 +325,8 @@ void analyzeFile(const fs::path &filepath) {
         if (!rec) {
             badCount++;
             errors.emplace_back(lineNo, vr.message + " -- \"" + line + "\"");
-        } else {
+        }
+        else {
             okCount++;
             goodRecords.push_back(*rec);
         }
@@ -330,7 +336,7 @@ void analyzeFile(const fs::path &filepath) {
     green(); cout << "  OK: " << okCount << "\n"; resetc();
     if (badCount) { red(); cout << "  Invalid: " << badCount << "\n"; resetc(); }
     cout << "\nDetailed errors (first 10):\n";
-    for (size_t i=0;i<errors.size() && i<10;++i) {
+    for (size_t i = 0;i < errors.size() && i < 10;++i) {
         cout << "  Line " << errors[i].first << ": " << errors[i].second << "\n";
     }
 
@@ -344,12 +350,12 @@ void analyzeFile(const fs::path &filepath) {
     if (!goodRecords.empty()) {
         cout << "\nExport valid records to CSV? (y/N): ";
         string ans; getline(cin, ans);
-        if (!ans.empty() && (ans[0]=='y' || ans[0]=='Y')) {
+        if (!ans.empty() && (ans[0] == 'y' || ans[0] == 'Y')) {
             fs::path outp = filepath;
             outp.replace_extension(".valid.csv");
             ofstream out(outp);
             out << "time,flight,computer\n";
-            for (auto &r : goodRecords) {
+            for (auto& r : goodRecords) {
                 out << formatTime(r) << ',' << r.flight << ',' << r.computer << '\n';
             }
             cout << "Wrote " << goodRecords.size() << " records to " << outp << "\n";
@@ -357,7 +363,7 @@ void analyzeFile(const fs::path &filepath) {
     }
 }
 
-void displayStored(const optional<Record> &r) {
+void displayStored(const optional<Record>& r) {
     cout << "\nStored values:\n";
     if (!r) {
         yellow(); cout << "  (no stored record)\n"; resetc();
@@ -400,18 +406,21 @@ int main() {
             if (!rec) {
                 red(); cout << "Invalid: " << vr.message << "\n"; resetc();
                 pauseForKey();
-            } else {
+            }
+            else {
                 green(); cout << "Record valid.\n"; resetc();
                 stored = *rec;
                 appendRecordToLatest(*rec);
                 cout << "Saved to " << kLatestFile << "\n";
                 pauseForKey();
             }
-        } else if (opt == "2") {
+        }
+        else if (opt == "2") {
             auto rec = kidFriendlyWizard();
             if (!rec) {
                 yellow(); cout << "Canceled guided entry.\n"; resetc();
-            } else {
+            }
+            else {
                 green(); cout << "Nice! Record is ready.\n"; resetc();
                 cout << "It looks like: " << formatTime(*rec) << " " << rec->flight << " " << rec->computer << "\n";
                 stored = *rec;
@@ -419,34 +428,40 @@ int main() {
                 cout << "Saved to " << kLatestFile << "\n";
             }
             pauseForKey();
-        } else if (opt == "3") {
+        }
+        else if (opt == "3") {
             displayLatestFile();
             pauseForKey();
-        } else if (opt == "4") {
+        }
+        else if (opt == "4") {
             string path = promptLine("Enter path (default data.txt): ");
             if (path.empty()) path = "data.txt";
             ifstream f(path);
             if (!f) { red(); cout << "Cannot open: " << path << "\n"; resetc(); pauseForKey(); }
             else {
                 cout << "\n---- File content ----\n";
-                string ln; size_t i=0;
-                while (getline(f, ln) && i<200) { cout << ln << "\n"; ++i; }
+                string ln; size_t i = 0;
+                while (getline(f, ln) && i < 200) { cout << ln << "\n"; ++i; }
                 if (!f.eof()) cout << "... (file long; only first 200 lines shown)\n";
                 pauseForKey();
             }
-        } else if (opt == "5") {
+        }
+        else if (opt == "5") {
             string path = promptLine("Enter path to analyze (default data.txt): ");
             if (path.empty()) path = "data.txt";
             analyzeFile(path);
             pauseForKey();
-        } else if (opt == "6") {
+        }
+        else if (opt == "6") {
             showQuickRules();
             cout << "\nUse Guided Mode if you are unsure. Type 'q' while answering to cancel.\n";
             pauseForKey();
-        } else if (opt == "7") {
+        }
+        else if (opt == "7") {
             cout << "Goodbye!\n";
             break;
-        } else {
+        }
+        else {
             cout << "Unknown option.\n";
             pauseForKey();
         }
